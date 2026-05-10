@@ -8,12 +8,10 @@ Author: lifei
 
 - Frequency-domain token scoring selects the context tokens that should be recomputed.
 - Hardware-aware scheduling balances PCIe transfer cost and GPU recomputation cost.
-- CPU offload stores reusable KV tensors in pinned memory for efficient DMA transfer.
 - Asynchronous pipeline overlap hides KV transfer behind attention computation.
-- Qwen2/Qwen2.5, Llama, Mistral, SAMSum, MuSiQue, WikiMQA, HotpotQA, and MultiNews examples are included.
 
 ## Installation
-
+The implementation is based on [vLLM](https://github.com/vllm-project/vllm)
 `Python >= 3.9` and `CUDA >= 12.1` are recommended. A GPU with at least 40 GB of memory is preferred for the largest examples.
 
 ```bash
@@ -27,9 +25,6 @@ pip install -r requirements.txt
 
 Run the basic example:
 
-```bash
-python example/blend.py
-```
 
 Run SAMSum with frequency selection:
 
@@ -40,11 +35,13 @@ python example/blend_samsum_freq.py
 Run Qwen on the supported benchmark scripts:
 
 ```bash
-python example/blend_samsum_freq_qwen.py
-python example/blend_musique_freq_qwen.py
-python example/blend_wikimqa_freq_qwen.py
-python example/blend_hotpotqa_freq_qwen.py
-python example/blend_multinews_freq_qwen.py
+CUDA_VISIBLE_DEVICES=0,1 python blend_samsum_freq_qwen.py --model-path Qwen2.5-32B-Instruct --tensor-parallel-size 2 --gpu-memory-utilization 0.85 --max-model-len 8192 --enforce-eager
+```
+
+Running hardware-aware adaptive recomputation ratio analysis:
+
+```bash
+python blend_samsum_freq_SSD.py
 ```
 
 ## Repository Layout
@@ -52,9 +49,6 @@ python example/blend_multinews_freq_qwen.py
 - `example/`: experiment drivers, benchmark scripts, and utility code.
 - `inputs/`: local benchmark input files.
 - `vllm_blend/`: the modified vLLM runtime used by CacheTune.
-- `method_report.md`: concise method description.
-- `technical_report.md`: implementation-level technical notes.
-- `optimization_summary.md`: optimization overview.
 
 ## Notes
 
