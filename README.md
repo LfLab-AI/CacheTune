@@ -47,7 +47,7 @@ python blend_samsum_freq_SSD.py
 ## Repository Layout
 
 - `example/`: experiment drivers, benchmark scripts, and utility code.
-- `inputs/`: local benchmark input files.
+- `example/inputs/`: local benchmark input files.
 - `vllm_blend/`: the modified vLLM runtime used by CacheTune.
 
 ## Notes
