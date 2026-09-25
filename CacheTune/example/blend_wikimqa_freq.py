@@ -1,3 +1,17 @@
+
+# BEGIN CACHETUNE PAPER DISPATCH
+def run_paper_method(argv=None):
+    """Run the opt-in ICLR 2027 method; the original path remains the default."""
+    from paper_runner import main
+    return main(dataset='wikimqa', default_storage='cpu',
+                is_qwen=False, argv=argv)
+
+
+if __name__ == "__main__":
+    from paper_dispatch import dispatch_if_requested as _dispatch_paper_method
+    _dispatch_paper_method(run_paper_method)
+# END CACHETUNE PAPER DISPATCH
+
 from vllm import LLM, SamplingParams
 import torch
 import numpy as np

@@ -19,6 +19,7 @@ from vllm.lora.request import LoRARequest
 from vllm.model_executor import set_random_seed
 from vllm.sequence import SamplerOutput, SequenceGroupMetadata
 from vllm.worker.cache_engine import CacheEngine
+from vllm.worker.cachetune_paper import CacheTunePaperWorkerMixin
 from vllm.worker.model_runner import ModelRunner
 from vllm.worker.worker_base import WorkerBase
 
@@ -26,7 +27,7 @@ from vllm.worker.worker_base import WorkerBase
 #from lmcache.config import LMCacheEngineConfig, LMCacheEngineMetadata
 
 
-class Worker(WorkerBase):
+class Worker(CacheTunePaperWorkerMixin, WorkerBase):
     """A worker class that executes (a partition of) the model on a GPU.
 
     Each worker is associated with a single GPU. The worker is responsible for
