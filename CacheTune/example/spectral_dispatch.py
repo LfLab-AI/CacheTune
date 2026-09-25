@@ -1,7 +1,7 @@
-"""Select the optional paper path without loading model or metric dependencies."""
+"""Select the optional spectral path without loading model or metric dependencies."""
 
 
-def dispatch_if_requested(run_paper_method):
+def dispatch_if_requested(run_spectral_method):
     """Consume only an explicit --method; otherwise preserve legacy argv exactly.
 
     The nine original drivers call this before their existing imports. Importing
@@ -18,9 +18,9 @@ def dispatch_if_requested(run_paper_method):
     import argparse
 
     parser = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
-    parser.add_argument("--method", choices=("legacy", "paper"),
+    parser.add_argument("--method", choices=("legacy", "spectral"),
                         default="legacy")
     method_args, remaining = parser.parse_known_args(args)
     sys.argv[1:] = remaining
-    if method_args.method == "paper":
-        raise SystemExit(run_paper_method(remaining))
+    if method_args.method == "spectral":
+        raise SystemExit(run_spectral_method(remaining))

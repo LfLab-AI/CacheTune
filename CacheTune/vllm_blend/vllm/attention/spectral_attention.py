@@ -1,10 +1,10 @@
-"""Torch-only causal-bias helper for the opt-in CacheTune paper path."""
+"""Torch-only causal-bias helper for the opt-in CacheTune spectral path."""
 
 import torch
 
 
 @torch.no_grad()
-def make_paper_causal_bias(
+def make_spectral_causal_bias(
     query: torch.Tensor,
     query_positions: torch.Tensor,
     num_key_tokens: int,
@@ -21,7 +21,7 @@ def make_paper_causal_bias(
     if not isinstance(query, torch.Tensor) or query.ndim not in (4, 5):
         raise ValueError("query must have xFormers BMHD or BMGHD shape")
     if query.shape[0] != 1 or not query.is_floating_point():
-        raise ValueError("paper selected-query attention requires one floating query batch")
+        raise ValueError("spectral selected-query attention requires one floating query batch")
     if any(size <= 0 for size in query.shape):
         raise ValueError("query axes must be nonempty")
     if (isinstance(num_key_tokens, bool) or not isinstance(num_key_tokens, int)

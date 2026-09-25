@@ -1,4 +1,4 @@
-"""CPU-only contracts for paper-route inputs, dispatch, and request assembly."""
+"""CPU-only contracts for spectral-route inputs, dispatch, and request assembly."""
 import importlib.util
 import json
 from pathlib import Path
@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "example"
-SPEC = importlib.util.spec_from_file_location("cachetune_paper_runner_under_test", EXAMPLES / "paper_runner.py")
+SPEC = importlib.util.spec_from_file_location("cachetune_spectral_runner_under_test", EXAMPLES / "spectral_runner.py")
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
 
@@ -137,7 +137,7 @@ class RequestTests(unittest.TestCase):
 
 
 class ParserTests(unittest.TestCase):
-    def test_paper_defaults_and_explicit_fixed_route(self):
+    def test_spectral_defaults_and_explicit_fixed_route(self):
         args = args_for()
         runner.validate_args(args)
         self.assertEqual((args.alpha, args.recomp_ratio, args.r_min), (0.5, 0.15, 0.15))
@@ -167,7 +167,7 @@ class ParserTests(unittest.TestCase):
             "blocked={'torch','vllm','transformers','rouge_score'}; "
             "builtins.__import__=lambda name,*a,**k: (_ for _ in ()).throw(AssertionError('heavy import: '+name)) if name.split('.')[0] in blocked else original(name,*a,**k); "
             "path=sys.argv[1];sys.path.insert(0,str(__import__('pathlib').Path(path).parent)); "
-            "sys.argv=[path,'--method=paper','--help'];runpy.run_path(path,run_name='__main__')"
+            "sys.argv=[path,'--method=spectral','--help'];runpy.run_path(path,run_name='__main__')"
         )
         for path in paths:
             with self.subTest(driver=path.name):

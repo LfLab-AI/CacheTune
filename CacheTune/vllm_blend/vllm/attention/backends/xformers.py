@@ -274,9 +274,9 @@ class XFormersImpl(AttentionImpl):
     ) -> torch.Tensor:
         
         assert attn_metadata.prompt_lens is not None
-        if (status in [1, 2] and cache_fuse_metadata.get("paper_causal_mask", False)
+        if (status in [1, 2] and cache_fuse_metadata.get("spectral_causal_mask", False)
                 and self.alibi_slopes is not None):
-            raise NotImplementedError("The paper selected-query path requires RoPE, not ALiBi")
+            raise NotImplementedError("The spectral selected-query path requires RoPE, not ALiBi")
         original_query = query
         if self.num_kv_heads != self.num_heads:
             query = query.view(query.shape[0], self.num_kv_heads,
@@ -303,12 +303,12 @@ class XFormersImpl(AttentionImpl):
             value = value.unsqueeze(0)
             
             if status in [1,2]:
-                if cache_fuse_metadata.get("paper_causal_mask", False):
+                if cache_fuse_metadata.get("spectral_causal_mask", False):
                     # Arbitrarily selected rows keep their absolute positions;
                     # bottom-right alignment would incorrectly expose future KVs.
-                    from vllm.attention.paper_attention import make_paper_causal_bias
+                    from vllm.attention.spectral_attention import make_spectral_causal_bias
                     if status == 1 or not isinstance(cache_fuse_metadata.get("attn_bias"), torch.Tensor):
-                        cache_fuse_metadata["attn_bias"] = make_paper_causal_bias(
+                        cache_fuse_metadata["attn_bias"] = make_spectral_causal_bias(
                             query, cache_fuse_metadata["imp_indices"], key.shape[1])
                 out = xops.memory_efficient_attention_forward(
                         query,
@@ -864,7 +864,7 @@ def _make_alibi_bias(
 #         #     `bias = bias[None, :].repeat(prompt_len, 1)`
 #         # here. We find that both biases give the same results, but
 #         # the bias below more accurately follows the original ALiBi
-#         # paper.
+#         # spectral.
 #         # Calculate a matrix where each element represents ith element- jth
 #         # element.
 #         bias = bias[None, :] - bias[:, None]

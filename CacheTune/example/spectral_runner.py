@@ -1,6 +1,6 @@
-"""Opt-in implementation of the supplied ICLR paper (legacy scripts stay default).
+"""K/V spectral selection and latency calibration (legacy scripts stay default).
 
-Model imports are deliberately lazy so every existing entry point exposes paper
+Model imports are deliberately lazy so every existing entry point exposes spectral
 help without CUDA. The selector and the measured deployment search are separate.
 """
 import argparse
@@ -13,7 +13,7 @@ import time
 
 
 def make_parser(dataset, default_storage, is_qwen):
-    parser = argparse.ArgumentParser(description="CacheTune paper frequency selection and Algorithm 1 GSS")
+    parser = argparse.ArgumentParser(description="CacheTune K/V spectral selection and warm-start golden-section search")
     parser.add_argument("--model-path", required=True)
     parser.add_argument("--dataset-path", type=Path)
     parser.add_argument("--dataset-target-path", type=Path, help="MultiNews .tgt file when input is .src")
@@ -39,8 +39,8 @@ def make_parser(dataset, default_storage, is_qwen):
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--profile-repeats", type=int, default=3)
     parser.add_argument("--storage", choices=("cpu", "disk"), default=default_storage)
-    parser.add_argument("--disk-root", type=Path, default=Path("disk_offload_cache/paper"))
-    parser.add_argument("--output-json", type=Path, default=Path("paper_results") / (dataset + ".json"))
+    parser.add_argument("--disk-root", type=Path, default=Path("disk_offload_cache/spectral"))
+    parser.add_argument("--output-json", type=Path, default=Path("spectral_results") / (dataset + ".json"))
     return parser
 
 
@@ -48,16 +48,16 @@ def validate_args(args):
     if not 0 < args.alpha <= 1:
         raise ValueError("alpha must lie in (0, 1]")
     if not 0.15 <= args.r_min < args.r_max <= 1:
-        raise ValueError("paper search bounds require 0.15 <= r-min < r-max <= 1")
+        raise ValueError("spectral search bounds require 0.15 <= r-min < r-max <= 1")
     if not 0.15 <= args.recomp_ratio <= 1:
-        raise ValueError("paper fixed ratio must lie in [0.15, 1]")
+        raise ValueError("spectral fixed ratio must lie in [0.15, 1]")
     if not 0 < args.gss_tolerance < args.r_max - args.r_min:
         raise ValueError("gss-tolerance must be positive and smaller than the search interval")
     for name in ("sample_limit", "calibration_samples", "repeats", "profile_repeats", "max_tokens", "max_context_tokens", "tensor_parallel_size"):
         if getattr(args, name) < 1:
             raise ValueError(name + " must be positive")
     if args.warmup < 0 or args.max_num_seqs != 1:
-        raise ValueError("warmup must be nonnegative; paper runner requires max-num-seqs=1")
+        raise ValueError("warmup must be nonnegative; spectral runner requires max-num-seqs=1")
     if args.max_context_tokens + args.max_tokens >= args.max_model_len:
         raise ValueError("max-model-len must leave room for context, query, and output")
 
@@ -218,9 +218,9 @@ def main(dataset, default_storage="cpu", is_qwen=False, argv=None):
     from transformers import AutoTokenizer
     from vllm import LLM, SamplingParams
     from vllm.worker.worker import Worker
-    if not hasattr(Worker, "cachetune_paper_begin"):
+    if not hasattr(Worker, "cachetune_spectral_begin"):
         raise RuntimeError("Installed vLLM is a different checkout. Install this repository's CacheTune/vllm_blend with pip install -e .")
-    from paper_algorithms import aggregate_spectral_statistics, select_shared_tokens, golden_section_search
+    from spectral_algorithms import aggregate_spectral_statistics, select_shared_tokens, golden_section_search
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     llm = LLM(model=args.model_path, tensor_parallel_size=args.tensor_parallel_size,
               gpu_memory_utilization=args.gpu_memory_utilization, max_model_len=args.max_model_len,
@@ -228,10 +228,10 @@ def main(dataset, default_storage="cpu", is_qwen=False, argv=None):
     llm.set_tokenizer(tokenizer)
     # Probe the new RPC before collecting anything. An unrelated editable vLLM
     # installation must not silently run an older implementation.
-    run_on_workers(llm, "cachetune_paper_release")
+    run_on_workers(llm, "cachetune_spectral_release")
     run_tag = time.strftime("%Y%m%d_%H%M%S") + "_" + str(time.time_ns())
     disk_root = str((args.disk_root / run_tag).resolve())
-    report = {"method": "paper", "status": "running", "dataset": dataset,
+    report = {"method": "spectral", "status": "running", "dataset": dataset,
               "dataset_path": str(evaluation_path), "configuration": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
               "protocol": {"fft_axis": "token", "alpha_semantics": "floor(alpha*(N//2+1)) retained rFFT bins",
                            "attention_backend": "XFORMERS; absolute-position causal mask for selected queries",
@@ -250,16 +250,16 @@ def main(dataset, default_storage="cpu", is_qwen=False, argv=None):
         return llm.generate(prompt_token_ids=[request["tokens"]], sampling_params=params, use_tqdm=False)
 
     def collect(request, context_id):
-        run_on_workers(llm, "cachetune_paper_begin", context_id=context_id)
+        run_on_workers(llm, "cachetune_spectral_begin", context_id=context_id)
         scores = []
         for index, chunk in enumerate(request["chunks"]):
             bos = tokenizer.bos_token_id
             leading = [bos] if index > 0 and bos is not None else []
             independent_tokens = leading + chunk
             llm.generate(prompt_token_ids=[independent_tokens], sampling_params=one_token, use_tqdm=False)
-            statistics_by_rank = run_on_workers(llm, "cachetune_paper_append_chunk", start=len(leading), end=len(independent_tokens), score=True, alpha=args.alpha)
+            statistics_by_rank = run_on_workers(llm, "cachetune_spectral_append_chunk", start=len(leading), end=len(independent_tokens), score=True, alpha=args.alpha)
             scores.append(aggregate_spectral_statistics(statistics_by_rank))
-        infos = run_on_workers(llm, "cachetune_paper_finalize", context_id=context_id, last_len=len(request["suffix"]))
+        infos = run_on_workers(llm, "cachetune_spectral_finalize", context_id=context_id, last_len=len(request["suffix"]))
         if any(info["total_len"] != len(request["tokens"]) for info in infos):
             raise RuntimeError("Collected KV/token layout differs across ranks or from assembled request")
         request.update(context_id=context_id, scores=scores, num_layers=infos[0]["num_layers"])
@@ -269,7 +269,7 @@ def main(dataset, default_storage="cpu", is_qwen=False, argv=None):
         context_len = sum(len(chunk) for chunk in request["chunks"])
         suffix_indices = torch.arange(context_len, len(request["tokens"]), dtype=torch.long)
         selected = torch.cat((selected.cpu(), suffix_indices))
-        run_on_workers(llm, "cachetune_paper_prepare", context_id=request["context_id"],
+        run_on_workers(llm, "cachetune_spectral_prepare", context_id=request["context_id"],
                               final_indices_cpu=selected, last_len=len(request["suffix"]), recomp_ratio=ratio,
                               storage=args.storage, disk_root=disk_root, check_layers=[1])
         return selected, reused
@@ -279,7 +279,7 @@ def main(dataset, default_storage="cpu", is_qwen=False, argv=None):
         if args.ratio_mode == "gss":
             calibration = [build_request(row, args.calibration_dataset, tokenizer, args, i) for i, row in enumerate(calibration_rows)]
             for i, request in enumerate(calibration):
-                print("[paper] collecting calibration request", i, flush=True)
+                print("[spectral] collecting calibration request", i, flush=True)
                 collect(request, "calibration_" + str(i))
             objective_trace = []
 
@@ -293,21 +293,21 @@ def main(dataset, default_storage="cpu", is_qwen=False, argv=None):
                             measurements.append(value)
                 mean = statistics.mean(measurements)
                 objective_trace.append({"ratio": candidate, "mean_ttft_s": mean, "ttft_s": measurements})
-                print("[paper GSS] ratio={:.6f} mean TTFT={:.6f}s".format(candidate, mean), flush=True)
+                print("[spectral GSS] ratio={:.6f} mean TTFT={:.6f}s".format(candidate, mean), flush=True)
                 return mean
 
             # Profiling is only a warm-start prior, never the search objective.
             # A full-prefill TTFT amortized by tokens/layers estimates tc. The
             # storage adapter measures the selected medium directly for ti.
             first = calibration[0]
-            run_on_workers(llm, "cachetune_paper_disable")
+            run_on_workers(llm, "cachetune_spectral_disable")
             dense_values = []
             for repeat in range(args.warmup + args.profile_repeats):
                 value = ttft(generate(first))
                 if repeat >= args.warmup:
                     dense_values.append(value)
             tc = statistics.median(dense_values) / (first["num_layers"] * len(first["tokens"]))
-            transfer = run_on_workers(llm, "cachetune_paper_profile_transfer", context_id=first["context_id"],
+            transfer = run_on_workers(llm, "cachetune_spectral_profile_transfer", context_id=first["context_id"],
                                       storage=args.storage, disk_root=disk_root, trials=args.profile_repeats)
             ti = max(item["seconds_per_token_layer"] for item in transfer)
             result = golden_section_search(objective, tc=tc, ti=ti, r_min=args.r_min, r_max=args.r_max, tolerance=args.gss_tolerance)
@@ -319,7 +319,7 @@ def main(dataset, default_storage="cpu", is_qwen=False, argv=None):
                               "fixed_overhead": "not separately identified; included in amortized tc prior; measured GSS objective includes complete TTFT", "full_ttft_s": dense_values, "transfer_by_rank": transfer},
                 "prior": result.prior, "ratio": ratio, "final_interval": list(result.interval), "midpoint_mean_ttft_s": result.value,
                 "iterations": result.iterations, "trace": objective_trace}
-            run_on_workers(llm, "cachetune_paper_release")
+            run_on_workers(llm, "cachetune_spectral_release")
             save_report(args.output_json, report)
         report["selected_ratio"] = ratio
         for index, row in enumerate(rows):
@@ -328,7 +328,7 @@ def main(dataset, default_storage="cpu", is_qwen=False, argv=None):
             selected, reused = prepare(request, ratio)
             cached = generate(request, args.max_tokens)
             cached_text, cached_time = cached[0].outputs[0].text, ttft(cached)
-            run_on_workers(llm, "cachetune_paper_disable")
+            run_on_workers(llm, "cachetune_spectral_disable")
             full = generate(request, args.max_tokens)
             full_text, full_time = full[0].outputs[0].text, ttft(full)
             record = {"sample_id": index, "token_sha256": request["token_sha256"], "chunk_lengths": [len(chunk) for chunk in request["chunks"]],
@@ -339,8 +339,8 @@ def main(dataset, default_storage="cpu", is_qwen=False, argv=None):
                       "cached_quality": quality_score(dataset, cached_text, request["answers"], tokenizer),
                       "full_quality": quality_score(dataset, full_text, request["answers"], tokenizer)}
             report["samples"].append(record)
-            print("[paper] sample={} r={:.5f} cached={:.5f}s full={:.5f}s".format(index, ratio, cached_time, full_time), flush=True)
-            run_on_workers(llm, "cachetune_paper_release", context_id="evaluation")
+            print("[spectral] sample={} r={:.5f} cached={:.5f}s full={:.5f}s".format(index, ratio, cached_time, full_time), flush=True)
+            run_on_workers(llm, "cachetune_spectral_release", context_id="evaluation")
             save_report(args.output_json, report)
         report["status"] = "complete"
         calibration_hashes = set((report["calibration"] or {}).get("request_token_sha256", []))
@@ -356,6 +356,6 @@ def main(dataset, default_storage="cpu", is_qwen=False, argv=None):
         save_report(args.output_json, report)
         raise
     finally:
-        run_on_workers(llm, "cachetune_paper_release")
-    print("[paper] complete:", args.output_json, flush=True)
+        run_on_workers(llm, "cachetune_spectral_release")
+    print("[spectral] complete:", args.output_json, flush=True)
     return 0

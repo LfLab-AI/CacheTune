@@ -1,16 +1,16 @@
 
-# BEGIN CACHETUNE PAPER DISPATCH
-def run_paper_method(argv=None):
-    """Run the opt-in ICLR 2027 method; the original path remains the default."""
-    from paper_runner import main
+# BEGIN CACHETUNE SPECTRAL DISPATCH
+def run_spectral_method(argv=None):
+    """Run K/V spectral selection; the original path remains the default."""
+    from spectral_runner import main
     return main(dataset='samsum', default_storage='disk',
                 is_qwen=False, argv=argv)
 
 
 if __name__ == "__main__":
-    from paper_dispatch import dispatch_if_requested as _dispatch_paper_method
-    _dispatch_paper_method(run_paper_method)
-# END CACHETUNE PAPER DISPATCH
+    from spectral_dispatch import dispatch_if_requested as _dispatch_spectral_method
+    _dispatch_spectral_method(run_spectral_method)
+# END CACHETUNE SPECTRAL DISPATCH
 
 from vllm import LLM, SamplingParams
 import torch

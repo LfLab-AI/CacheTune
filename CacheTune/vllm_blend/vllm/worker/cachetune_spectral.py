@@ -1,4 +1,4 @@
-"""Opt-in paper-path worker state; the original CacheTune path is untouched.
+"""Opt-in spectral-path worker state; the original CacheTune path is untouched.
 
 Chunk statistics stay sharded until the driver sums squared norms over TP
 workers.  Summing norms after sqrt would give a different token ranking.
@@ -44,18 +44,18 @@ def _load_tensor(path: str) -> torch.Tensor:
 
 def _install_disk_prefetch(model) -> None:
     """Install an instance-only adapter; inactive calls use original methods."""
-    if getattr(model, "_paper_disk_adapter_installed", False):
+    if getattr(model, "_spectral_disk_adapter_installed", False):
         return
-    model._paper_original_prefetch = model._prefetch_layer
-    model._paper_original_rebuild = model._rebuild_old_kv
-    model._paper_disk_cpu_buffers = {}
+    model._spectral_original_prefetch = model._prefetch_layer
+    model._spectral_original_rebuild = model._rebuild_old_kv
+    model._spectral_disk_cpu_buffers = {}
 
     def prefetch(self, layer_idx):
         meta = self.cache_fuse_metadata
-        if not meta.get("paper_disk_enabled", False):
-            return self._paper_original_prefetch(layer_idx)
-        paths = meta["paper_disk_paths"]
-        shapes = meta["paper_disk_shapes"]
+        if not meta.get("spectral_disk_enabled", False):
+            return self._spectral_original_prefetch(layer_idx)
+        paths = meta["spectral_disk_paths"]
+        shapes = meta["spectral_disk_shapes"]
         if not 0 <= layer_idx < len(paths):
             return
         shape, dtype = shapes[layer_idx]
@@ -72,26 +72,26 @@ def _install_disk_prefetch(model) -> None:
             v_gpu = cpu_v.to("cuda", non_blocking=True)
             self._transfer_events[layer_idx].record(self._transfer_stream)
         # Keep pinned buffers alive until their DMA event is complete.
-        self._paper_disk_cpu_buffers[layer_idx] = (cpu_k, cpu_v)
+        self._spectral_disk_cpu_buffers[layer_idx] = (cpu_k, cpu_v)
         self._prefetch_buffers[layer_idx] = ("full", k_gpu, v_gpu)
 
     def rebuild(self, layer_idx):
-        self._paper_original_rebuild(layer_idx)
-        self._paper_disk_cpu_buffers.pop(layer_idx, None)
+        self._spectral_original_rebuild(layer_idx)
+        self._spectral_disk_cpu_buffers.pop(layer_idx, None)
 
     model._prefetch_layer = MethodType(prefetch, model)
     model._rebuild_old_kv = MethodType(rebuild, model)
-    model._paper_disk_adapter_installed = True
+    model._spectral_disk_adapter_installed = True
 
 
-class CacheTunePaperWorkerMixin:
-    """Only called by examples that explicitly select --method paper."""
+class CacheTuneSpectralWorkerMixin:
+    """Only called by examples that explicitly select --method spectral."""
 
-    def _paper_model(self):
+    def _spectral_model(self):
         return self.model_runner.model.model
 
-    def _paper_clear_runtime(self) -> None:
-        model = self._paper_model()
+    def _spectral_clear_runtime(self) -> None:
+        model = self._spectral_model()
         # A completed generate() can leave stream work or cache tensors alive.
         torch.cuda.synchronize()
         meta = model.cache_fuse_metadata
@@ -99,46 +99,46 @@ class CacheTunePaperWorkerMixin:
                 "cpu_kv_cache", "non_imp_indices", "transfer_indices",
                 "reuse_indices", "precomputed_indices", "work_key", "work_val",
                 "gpu_transfer_k", "gpu_transfer_v", "disk_kv_cache",
-                "disk_kv_meta", "paper_disk_paths", "paper_disk_shapes",
+                "disk_kv_meta", "spectral_disk_paths", "spectral_disk_shapes",
                 "org_pos", "original_slot_mapping", "our_slot_mapping"):
             meta.pop(name, None)
         meta.update(collect=False, check=False, pipeline_enabled=False,
                     attn_bias=None, imp_indices=None, fake_q=None,
                     layer_counter=0, use_disk_kv_cache=False,
-                    paper_disk_enabled=False, paper_causal_mask=False)
+                    spectral_disk_enabled=False, spectral_causal_mask=False)
         model._pipeline_initialized = False
         model._prefetch_buffers = {}
         model.old_kvs = [[None, None] for _ in model.layers]
-        if hasattr(model, "_paper_disk_cpu_buffers"):
-            model._paper_disk_cpu_buffers.clear()
+        if hasattr(model, "_spectral_disk_cpu_buffers"):
+            model._spectral_disk_cpu_buffers.clear()
         if hasattr(model, "_cached_sparse_positions"):
             model._cached_sparse_positions = None
         if hasattr(model, "_warmup_prefetched_layer"):
             model._warmup_prefetched_layer = None
 
-    def cachetune_paper_begin(self, context_id: str = "current") -> None:
-        self._paper_clear_runtime()
-        if not hasattr(self, "_paper_contexts"):
-            self._paper_contexts = {}
-        if context_id in self._paper_contexts:
-            self.cachetune_paper_release(context_id)
-        self._paper_active_context = context_id
-        self._paper_contexts[context_id] = {
+    def cachetune_spectral_begin(self, context_id: str = "current") -> None:
+        self._spectral_clear_runtime()
+        if not hasattr(self, "_spectral_contexts"):
+            self._spectral_contexts = {}
+        if context_id in self._spectral_contexts:
+            self.cachetune_spectral_release(context_id)
+        self._spectral_active_context = context_id
+        self._spectral_contexts[context_id] = {
             "chunks": [], "full_kv": None, "chunk_lengths": [], "disk": None,
             "suffix_len": None}
-        model = self._paper_model()
+        model = self._spectral_model()
         for layer in model.layers:
             layer.self_attn.hack_kv = None
         model.cache_fuse_metadata.update(collect=True, check=False)
 
-    def cachetune_paper_append_chunk(
+    def cachetune_spectral_append_chunk(
             self, start: int, end: int, score: bool = True,
             alpha: float = 0.5) -> Dict[str, Any]:
         """Capture one completed prefill using exact token-ID slice bounds."""
-        model = self._paper_model()
-        context = self._paper_contexts[self._paper_active_context]
+        model = self._spectral_model()
+        context = self._spectral_contexts[self._spectral_active_context]
         if context["full_kv"] is not None:
-            raise RuntimeError("Cannot append after paper cache finalization")
+            raise RuntimeError("Cannot append after spectral cache finalization")
         if start < 0 or end <= start:
             raise ValueError("Chunk slice must satisfy 0 <= start < end")
         chunk, k_sq, v_sq, replication = [], [], [], []
@@ -170,7 +170,7 @@ class CacheTunePaperWorkerMixin:
             result.update(k_sq=torch.stack(k_sq), v_sq=torch.stack(v_sq))
         return result
 
-    def cachetune_paper_finalize(
+    def cachetune_spectral_finalize(
             self, context_id: str = "current", last_len: int = 0) -> Dict[str, Any]:
         """Seal cached chunks and reserve zero placeholders for the new query.
 
@@ -178,13 +178,13 @@ The suffix is never collected or scored offline. Its placeholder rows only
 reserve absolute positions: prepare() requires them all to be recomputed and
 never transfers them from CPU or disk.
         """
-        context = self._paper_contexts[context_id]
-        model = self._paper_model()
+        context = self._spectral_contexts[context_id]
+        model = self._spectral_model()
         if last_len < 0:
             raise ValueError("Suffix length cannot be negative")
         if context["full_kv"] is None:
             if not context["chunks"]:
-                raise RuntimeError("Paper context has no collected chunks")
+                raise RuntimeError("Spectral context has no collected chunks")
             if last_len:
                 first_chunk = context["chunks"][0]
                 context["chunks"].append([
@@ -212,17 +212,17 @@ never transfers them from CPU or disk.
                 "suffix_len": context["suffix_len"],
                 "chunk_lengths": list(context["chunk_lengths"])}
 
-    def cachetune_paper_prepare(
+    def cachetune_spectral_prepare(
             self, final_indices_cpu: torch.Tensor, last_len: int,
             recomp_ratio: float, storage: str = "cpu",
             disk_root: Optional[str] = None,
             check_layers: Optional[List[int]] = None,
             context_id: str = "current") -> Dict[str, Any]:
         """Install a fresh compact cache; keep the full source immutable."""
-        context = self._paper_contexts[context_id]
+        context = self._spectral_contexts[context_id]
         full_kv = context["full_kv"]
         if full_kv is None:
-            raise RuntimeError("Finalize paper context before prepare")
+            raise RuntimeError("Finalize spectral context before prepare")
         if storage not in ("cpu", "disk"):
             raise ValueError("storage must be cpu or disk")
         if not 0.0 <= recomp_ratio <= 1.0:
@@ -236,21 +236,21 @@ never transfers them from CPU or disk.
                                    device="cpu").flatten()
         if (selected.numel() == 0 or selected.min() < 0
                 or selected.max() >= total):
-            raise ValueError("Paper recompute indices are empty or out of range")
+            raise ValueError("Spectral recompute indices are empty or out of range")
         if not torch.equal(selected, torch.unique(selected, sorted=True)):
-            raise ValueError("Paper recompute indices must be sorted and unique")
+            raise ValueError("Spectral recompute indices must be sorted and unique")
         suffix = torch.arange(total - last_len, total, dtype=torch.int64)
         if not torch.equal(selected[-last_len:], suffix):
             raise ValueError("Every suffix token must be recomputed")
         mask = torch.ones(total, dtype=torch.bool)
         mask[selected] = False
         reused = torch.arange(total, dtype=torch.int64)[mask]
-        self._paper_clear_runtime()
-        model = self._paper_model()
+        self._spectral_clear_runtime()
+        model = self._spectral_model()
         meta = model.cache_fuse_metadata
         check_layers = [1] if check_layers is None else list(check_layers)
         if (len(check_layers) != 1 or not 0 <= check_layers[0] < len(model.layers)):
-            raise ValueError("Paper path requires one valid check layer")
+            raise ValueError("Spectral path requires one valid check layer")
         if reused.numel() == 0:
             # Full recompute needs no compact KV or empty-tensor RoPE kernels.
             return {"total_len": total, "recompute_tokens": total,
@@ -270,7 +270,7 @@ never transfers them from CPU or disk.
                 root = Path(disk_root or "disk_offload_cache")
                 root.mkdir(parents=True, exist_ok=True)
                 context["disk"] = Path(tempfile.mkdtemp(
-                    prefix="paper_rank%d_" % self.rank, dir=str(root)))
+                    prefix="spectral_rank%d_" % self.rank, dir=str(root)))
             paths, shapes = [], []
             for i, (k, v) in enumerate(full_kv):
                 k_path = context["disk"] / ("layer_%d_k.pt" % i)
@@ -280,8 +280,8 @@ never transfers them from CPU or disk.
                 torch.save(v_compact, str(v_path))
                 paths.append((str(k_path), str(v_path)))
                 shapes.append((tuple(k_compact.shape), k_compact.dtype))
-            meta.update(paper_disk_enabled=True, paper_disk_paths=paths,
-                        paper_disk_shapes=shapes,
+            meta.update(spectral_disk_enabled=True, spectral_disk_paths=paths,
+                        spectral_disk_shapes=shapes,
                         cpu_kv_cache=[None] * len(full_kv))
         attn = model.layers[0].self_attn
         shape = (total, attn.num_kv_heads, attn.head_dim)
@@ -292,17 +292,17 @@ never transfers them from CPU or disk.
                     check_layers=check_layers, check=True, collect=False,
                     recomp_ratio=float(recomp_ratio), fast_attention=True,
                     suffix_len=int(last_len), pipeline_enabled=True,
-                    layer_counter=0, paper_causal_mask=True)
+                    layer_counter=0, spectral_causal_mask=True)
         return {"total_len": total, "recompute_tokens": selected.numel(),
                 "transfer_tokens": reused.numel(), "full_prefill": False}
 
-    def cachetune_paper_disable(self) -> None:
+    def cachetune_spectral_disable(self) -> None:
         """Run baseline/full prefill while retaining calibration snapshots."""
-        self._paper_clear_runtime()
+        self._spectral_clear_runtime()
 
-    def cachetune_paper_release(self, context_id: Optional[str] = None) -> None:
-        self._paper_clear_runtime()
-        contexts = getattr(self, "_paper_contexts", {})
+    def cachetune_spectral_release(self, context_id: Optional[str] = None) -> None:
+        self._spectral_clear_runtime()
+        contexts = getattr(self, "_spectral_contexts", {})
         keys = list(contexts) if context_id is None else [context_id]
         for key in keys:
             context = contexts.pop(key, None)
@@ -314,7 +314,7 @@ never transfers them from CPU or disk.
                 path.unlink()
             folder.rmdir()
 
-    def cachetune_paper_profile_transfer(
+    def cachetune_spectral_profile_transfer(
             self, context_id: str = "current", storage: str = "cpu",
             disk_root: Optional[str] = None, trials: int = 3) -> Dict[str, Any]:
         """Measure one full layer's actual load + DMA, excluding file writes.
@@ -324,7 +324,7 @@ SSD throughput, and must not be described as such in experiment reports.
         """
         if storage not in ("cpu", "disk") or trials < 1:
             raise ValueError("Invalid transfer profile configuration")
-        context = self._paper_contexts[context_id]
+        context = self._spectral_contexts[context_id]
         full_kv = context["full_kv"]
         if full_kv is None:
             raise RuntimeError("Finalize context before profiling")
@@ -340,7 +340,7 @@ SSD throughput, and must not be described as such in experiment reports.
             if storage == "disk":
                 root = Path(disk_root or "disk_offload_cache")
                 root.mkdir(parents=True, exist_ok=True)
-                folder = Path(tempfile.mkdtemp(prefix="paper_profile_", dir=str(root)))
+                folder = Path(tempfile.mkdtemp(prefix="spectral_profile_", dir=str(root)))
                 torch.save(k, str(folder / "k.pt"))
                 torch.save(v, str(folder / "v.pt"))
             for _ in range(trials):

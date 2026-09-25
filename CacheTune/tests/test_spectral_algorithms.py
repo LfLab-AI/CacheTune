@@ -1,4 +1,4 @@
-"""CPU-only checks for the optional paper implementation; no vLLM required."""
+"""CPU-only checks for the optional spectral implementation; no vLLM required."""
 
 import math
 from pathlib import Path
@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "example"))
-from paper_algorithms import (  # noqa: E402
+from spectral_algorithms import (  # noqa: E402
     aggregate_spectral_statistics,
     golden_section_search,
     lowpass_reconstruct,
@@ -183,7 +183,7 @@ class GSSTests(unittest.TestCase):
                 reused = set((before.x1, before.x2)) & set((after.x1, after.x2))
                 self.assertEqual(len(reused), 1)
 
-    def test_paper_tie_comparisons_differ_in_warm_and_standard_steps(self):
+    def test_spectral_tie_comparisons_differ_in_warm_and_standard_steps(self):
         result = golden_section_search(lambda r: 1.0, 1., 1., tolerance=.1)
         warm, standard, first_refine = result.trace[:3]
         self.assertEqual(standard.b, warm.x2)  # <= keeps left during warm start.

@@ -1,8 +1,8 @@
-"""Pure numerical helpers for the optional manuscript-compatible example path.
+"""Numerical helpers for K/V spectral selection and latency calibration.
 
-The legacy examples do not import this module unless the paper path is selected.
-Frequency filtering follows Section 4.1 / Appendix A; calibration follows
-Algorithm 1 in the supplied CacheTune ICLR 2027 manuscript. No vLLM is required.
+The legacy examples do not import this module unless the spectral path is selected.
+Chunk-local low-pass filtering supplies token scores; warm-start golden-section
+search calibrates the recomputation budget. No vLLM is required.
 """
 
 from dataclasses import dataclass
@@ -106,8 +106,7 @@ def aggregate_spectral_statistics(
     taking the K and V square roots. The score is their arithmetic mean, then
     normalized by that layer's token sum plus epsilon. Returns CPU [N].
 
-    Epsilon=1e-12 is an explicit numerical engineering choice, not a measured
-    parameter of the manuscript.
+    Epsilon=1e-12 stabilizes the per-layer normalization for zero or tiny scores.
     """
     epsilon = _finite_number(epsilon, "epsilon")
     if epsilon <= 0:
@@ -243,14 +242,14 @@ def golden_section_search(
     tolerance: float = 0.01,
     r_min: float = 0.15,
 ) -> GSSResult:
-    """Warm-started GSS exactly matching manuscript Algorithm 1.
+    """Minimize a measured objective using roofline-warm-started GSS.
 
     ``objective`` must measure mean complete-request TTFT on the same fixed
     calibration set and offline rankings at every ratio. tc and ti are positive
     per-unit recomputation/transfer costs. They determine the clipped roofline
     prior; the measured objective determines the search. r_max=1 and tolerance
     0.01 are configurable engineering defaults. The generic helper accepts
-    bounds in [0, 1]; the paper experiment uses r_min=0.15.
+    bounds in [0, 1]; the default lower bound is r_min=0.15.
 
     As a reporting extension, the returned interval midpoint is explicitly
     evaluated, so ``value`` always belongs to the returned deployment ratio.
@@ -294,7 +293,7 @@ def golden_section_search(
         x1, x2 = b - phi * (b - a), prior
     f1, f2 = evaluate(x1), evaluate(x2)
     trace.append(GSSTrace("warm", a, b, x1, x2, f1, f2))
-    if f1 <= f2:  # Algorithm 1, line 5 uses a non-strict comparison.
+    if f1 <= f2:  # Warm-start ties retain the left interval.
         b = x2
     else:
         a = x1
@@ -305,7 +304,7 @@ def golden_section_search(
     trace.append(GSSTrace("reinitialize", a, b, x1, x2, f1, f2))
     iterations = 0
     while b - a >= tolerance:
-        if f1 < f2:  # Algorithm 1, line 9 uses a strict comparison.
+        if f1 < f2:  # Standard-step ties retain the right interval.
             b, x2, f2 = x2, x1, f1
             x1 = b - phi * (b - a)
             f1 = evaluate(x1)
