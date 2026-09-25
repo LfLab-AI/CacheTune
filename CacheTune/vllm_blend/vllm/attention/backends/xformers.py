@@ -304,8 +304,6 @@ class XFormersImpl(AttentionImpl):
             
             if status in [1,2]:
                 if cache_fuse_metadata.get("spectral_causal_mask", False):
-                    # Arbitrarily selected rows keep their absolute positions;
-                    # bottom-right alignment would incorrectly expose future KVs.
                     from vllm.attention.spectral_attention import make_spectral_causal_bias
                     if status == 1 or not isinstance(cache_fuse_metadata.get("attn_bias"), torch.Tensor):
                         cache_fuse_metadata["attn_bias"] = make_spectral_causal_bias(
@@ -864,7 +862,7 @@ def _make_alibi_bias(
 #         #     `bias = bias[None, :].repeat(prompt_len, 1)`
 #         # here. We find that both biases give the same results, but
 #         # the bias below more accurately follows the original ALiBi
-#         # spectral.
+#         # paper.
 #         # Calculate a matrix where each element represents ith element- jth
 #         # element.
 #         bias = bias[None, :] - bias[:, None]

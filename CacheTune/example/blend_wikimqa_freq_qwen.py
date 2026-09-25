@@ -2,9 +2,7 @@
 CacheTune for Qwen2.5 on WikiMQA dataset (TP-aware).
 """
 
-# BEGIN CACHETUNE SPECTRAL DISPATCH
 def run_spectral_method(argv=None):
-    """Run K/V spectral selection; the original path remains the default."""
     from spectral_runner import main
     return main(dataset='wikimqa', default_storage='cpu',
                 is_qwen=True, argv=argv)
@@ -13,7 +11,6 @@ def run_spectral_method(argv=None):
 if __name__ == "__main__":
     from spectral_dispatch import dispatch_if_requested as _dispatch_spectral_method
     _dispatch_spectral_method(run_spectral_method)
-# END CACHETUNE SPECTRAL DISPATCH
 
 
 from vllm import LLM, SamplingParams
