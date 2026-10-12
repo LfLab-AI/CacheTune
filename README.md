@@ -1,9 +1,11 @@
 # CacheTune
 
+
+**Due to an oversight on our part when changing the source repository from public to private, file contents in the anonymous repository may have been inaccessible between September 27 and October 10. We identified and resolved the issue during a subsequent check, and access has now been restored. We sincerely apologize for any inconvenience this may have caused during your review of our code.**
+
 CacheTune is a KV cache reuse system for efficient long-context LLM inference. It combines frequency-domain token selection, hardware-aware recomputation scheduling, CPU pinned-memory offload, and asynchronous layer-wise transfer to reduce time to first token while preserving generation quality.
 
 
-**Due to an oversight on our part when changing the source repository from public to private, file contents in the anonymous repository may have been inaccessible between September 27 and October 10. We identified and resolved the issue during a subsequent check, and access has now been restored. We sincerely apologize for any inconvenience this may have caused during your review of our code.**
 
 ## Highlights
 
