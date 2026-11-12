@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cachetune-vllm-adapter"
+version = "0.2.0"
+description = "CacheTune sparse non-prefix KV repair for vLLM 0.17.1"
+requires-python = ">=3.10"
+dependencies = ["vllm==0.17.1", "flashinfer-python==0.6.4", "rouge-score"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.entry-points."vllm.general_plugins"]
+cachetune = "cachetune:register_models"
+
+[tool.setuptools.packages.find]
+include = ["cachetune*"]
+

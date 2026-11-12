@@ -1,0 +1,7 @@
+{
+  "chunks": [
+    "Read the following independent reports and answer the question after them.\n\nReport one: The Cedar project builds a small bridge over the northern river. Its planning committee selected steel because the bridge must remain usable during winter. Construction began in March and the bridge opened in November.\n\n",
+    "Report two: The Willow project renovates the southern library. Its team selected wood for the reading room and glass for the entrance. Work began in April and the renovated library opened in September.\n\n"
+  ],
+  "query": "Question: Which project selected steel for a bridge? Answer briefly.\nAnswer:"
+}

@@ -1,0 +1,146 @@
+{
+  "date": "2026-11-13",
+  "scope": "Implementation correctness, not task quality or serving performance",
+  "method_reference_commit": "0c58c7b3a4dac9e3bca7eb8292c8449fae10d35e",
+  "hardware": "NVIDIA A100-SXM4-40GB",
+  "execution": {
+    "tp": 1,
+    "pp": 1,
+    "max_num_seqs": 1,
+    "eager": true
+  },
+  "environment": {
+    "python": "3.12.13",
+    "torch": "2.10.0+cu129",
+    "vllm": "0.17.1",
+    "transformers": "4.57.6",
+    "flashinfer": "0.6.4",
+    "cuda_toolkit": "12.8"
+  },
+  "unit_suite": {
+    "passed": 219,
+    "subtests_passed": 40,
+    "failed": 0,
+    "command": "python -m pytest -q tests"
+  },
+  "wheel_build": {
+    "status": "PASS",
+    "filename": "cachetune_vllm_adapter-0.2.0-py3-none-any.whl"
+  },
+  "official_vllm_python_source_audit": {
+    "compared_files": 1386,
+    "modified_files": 0
+  },
+  "real_models": [
+    {
+      "model": "Meta-Llama-3-8B",
+      "status": "PASS",
+      "layers": 32,
+      "full_attention_layers": 32,
+      "recurrent_layers": 0,
+      "ratio_one_cases": 2,
+      "ratio_one_max_logit_error": 0.0,
+      "cache_mode_repeats": 6,
+      "aba_cases": 3,
+      "query_changed_without_recollection": true,
+      "versions": {
+        "python": "3.12.13 (main, Mar  3 2026, 14:59:34) [Clang 21.1.4 ]",
+        "torch": "2.10.0+cu129",
+        "vllm": "0.17.1",
+        "cuda": "12.9"
+      }
+    },
+    {
+      "model": "Mistral-7B-Instruct-v0.3",
+      "status": "PASS",
+      "layers": 32,
+      "full_attention_layers": 32,
+      "recurrent_layers": 0,
+      "ratio_one_cases": 2,
+      "ratio_one_max_logit_error": 0.0,
+      "cache_mode_repeats": 6,
+      "aba_cases": 3,
+      "query_changed_without_recollection": true,
+      "versions": {
+        "python": "3.12.13 (main, Mar  3 2026, 14:59:34) [Clang 21.1.4 ]",
+        "torch": "2.10.0+cu129",
+        "vllm": "0.17.1",
+        "cuda": "12.9"
+      }
+    },
+    {
+      "model": "Qwen2.5-0.5B-Instruct",
+      "status": "PASS",
+      "layers": 24,
+      "full_attention_layers": 24,
+      "recurrent_layers": 0,
+      "ratio_one_cases": 2,
+      "ratio_one_max_logit_error": 0.0,
+      "cache_mode_repeats": 6,
+      "aba_cases": 3,
+      "query_changed_without_recollection": true,
+      "versions": {
+        "python": "3.12.13 (main, Mar  3 2026, 14:59:34) [Clang 21.1.4 ]",
+        "torch": "2.10.0+cu129",
+        "vllm": "0.17.1",
+        "cuda": "12.9"
+      }
+    },
+    {
+      "model": "Qwen3-0.6B",
+      "status": "PASS",
+      "layers": 28,
+      "full_attention_layers": 28,
+      "recurrent_layers": 0,
+      "ratio_one_cases": 2,
+      "ratio_one_max_logit_error": 0.0,
+      "cache_mode_repeats": 6,
+      "aba_cases": 3,
+      "query_changed_without_recollection": true,
+      "versions": {
+        "python": "3.12.13 (main, Mar  3 2026, 14:59:34) [Clang 21.1.4 ]",
+        "torch": "2.10.0+cu129",
+        "vllm": "0.17.1",
+        "cuda": "12.9"
+      }
+    },
+    {
+      "model": "Qwen3.5-0.8B",
+      "status": "PASS",
+      "layers": 24,
+      "full_attention_layers": 6,
+      "recurrent_layers": 18,
+      "ratio_one_cases": 2,
+      "ratio_one_max_logit_error": 0.0,
+      "cache_mode_repeats": 6,
+      "aba_cases": 3,
+      "query_changed_without_recollection": true,
+      "versions": {
+        "python": "3.12.13 (main, Mar  3 2026, 14:59:34) [Clang 21.1.4 ]",
+        "torch": "2.10.0+cu129",
+        "vllm": "0.17.1",
+        "cuda": "12.9"
+      }
+    }
+  ],
+  "public_runner": {
+    "fixed": {
+      "status": "complete",
+      "ratio": 0.15,
+      "sample_count": 1
+    },
+    "gss": {
+      "status": "complete",
+      "objective_evaluations": 6,
+      "returned_ratio": 0.21405764746872633,
+      "returned_ratio_explicitly_measured": true,
+      "smoke_only": true,
+      "search_bounds": [
+        0.15,
+        0.3
+      ],
+      "cost_profiled": true
+    }
+  },
+  "spectral_helper_sha256": "f28ddb77d79707f7da074533bf6bd49a8627d39e0782987f75a41de29a7a13ab"
+}
