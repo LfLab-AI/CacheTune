@@ -51,9 +51,6 @@ python vllm_0_17_1/example/run_spectral.py \
   --output-json spectral_result.json
 ```
 
-The query is not encoded into reusable offline chunks, scored, or loaded from their cache. It is appended online and recomputed in full. Default cutoff `alpha=0.5` is exposed as `--low-freq-pct` in the SAMSum driver. The paper-aligned selection uses both K and V, normalizes within each layer and chunk, averages all cached attention layers, and selects `floor(ratio * chunk_length)` positions separately per chunk. Equal scores prefer the lower original position. No sink positions are forced by default.
-
-For deployment calibration, use `--ratio-mode gss` in the explicit-chunk runner. The warm-start prior comes from recomputation and transfer costs, while candidate ratios are compared using measured request TTFT. See `python vllm_0_17_1/example/run_spectral.py --help` for calibration parameters. Fixed-ratio evaluation uses `--ratio-mode fixed` and does not run the search.
 
 
 ## Qwen3.5 hybrid attention
