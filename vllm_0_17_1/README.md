@@ -70,5 +70,5 @@ bash vllm_0_17_1/run_qwen35_samsum15.sh \
 
 ## License
 
-`LICENSE` retains the upstream Apache License 2.0 from the legacy vLLM fork. The adapter builds on [vLLM 0.17.1](https://github.com/vllm-project/vllm/tree/v0.17.1), and its spectral helpers follow the published [`CacheTune/example/spectral_algorithms.py`](../CacheTune/example/spectral_algorithms.py). Keep the upstream license and notices when redistributing source.
+`LICENSE` retains the upstream Apache License 2.0 from the legacy vLLM fork. The adapter builds on [vLLM 0.17.1](https://github.com/vllm-project/vllm/tree/v0.17.1). Keep the upstream license and notices when redistributing source.
 
