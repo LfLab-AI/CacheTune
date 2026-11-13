@@ -60,11 +60,11 @@ The `CacheTune/vllm_blend/` directory contains modified vLLM code and keeps its 
 
 The two implementations are stored side by side and use separate Python environments.
 
-| Implementation | Directory | Main entry points |
-|---|---|---|
-| Legacy vLLM **0.4.1** fork | [`CacheTune/vllm_blend/`](CacheTune/vllm_blend/) | [`CacheTune/example/`](CacheTune/example/); use `--method spectral` for the paper-aligned K/V, all-layer spectral path. Original legacy drivers remain available. |
-| vLLM **0.17.1** plugin and worker extension | [`vllm_0_17_1/`](vllm_0_17_1/) | [`vllm_0_17_1/example/run_spectral.py`](vllm_0_17_1/example/run_spectral.py) for explicit chunks and a query; [`run_samsum.sh`](vllm_0_17_1/run_samsum.sh) for SAMSum. |
-| Qwen3.5 dense text hybrid attention | [`vllm_0_17_1/cachetune/hybrid.py`](vllm_0_17_1/cachetune/hybrid.py), [`hybrid_state.py`](vllm_0_17_1/cachetune/hybrid_state.py) | [`vllm_0_17_1/run_qwen35_samsum15.sh`](vllm_0_17_1/run_qwen35_samsum15.sh); default policy: `block`. |
+| Implementation | Directory |
+|---|---|
+| Legacy vLLM **0.4.1** fork | [`CacheTune/vllm_blend/`](CacheTune/vllm_blend/) |
+| vLLM **0.17.1** plugin and worker extension | [`vllm_0_17_1/`](vllm_0_17_1/) | 
+| Qwen3.5 dense text hybrid attention | [`vllm_0_17_1/cachetune/hybrid.py`](vllm_0_17_1/cachetune/hybrid.py), [`hybrid_state.py`](vllm_0_17_1/cachetune/hybrid_state.py) | 
 
 Install the new adapter from the repository root in its own environment:
 
@@ -72,6 +72,6 @@ Install the new adapter from the repository root in its own environment:
 python -m pip install -e './vllm_0_17_1[test]'
 ```
 
-The new implementation uses official vLLM 0.17.1 and FlashInfer 0.6.4; it does not vendor another complete upstream vLLM tree. It scores independently encoded chunks using pre-RoPE K and V from all cached attention layers, shares one selected set across layers, and always computes the query suffix online. Qwen3.5 keeps all Gated DeltaNet recurrent updates on the complete ordered sequence and applies selective repair to its full-attention blocks. Its token budget therefore does not describe total model FLOPs.
+The new implementation uses official vLLM 0.17.1 and FlashInfer 0.6.4; it does not vendor another complete upstream vLLM tree.
 
-See the [new-version README](vllm_0_17_1/README.md) for installation, supported execution modes and validation, and [METHOD.md](vllm_0_17_1/METHOD.md) for the correspondence to the paper. This port is a single-request eager implementation (TP=PP=1); using the new vLLM version does not establish production continuous-batching support.
+See the [new-version README](vllm_0_17_1/README.md) for installation, supported execution modes and validation, and [METHOD.md](vllm_0_17_1/METHOD.md) for the correspondence to the paper.
